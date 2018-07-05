@@ -15,7 +15,7 @@ chai.use(chaiHttp);
 
 function seedBlogPostData() {
   console.info('seeding blog data');
-  const seedData = [];
+  let seedData = [];
 
   for (let i=1; i<=5; i++) {
     seedData.push(generateBlogPostData());
@@ -24,35 +24,11 @@ function seedBlogPostData() {
   return BlogPost.insertMany(seedData);
 }
 
-function generateAuthorName() {
-
-  const firstNames = [
-    'Stanley', 'Darius', 'Kyle', 'Ronald', 'Julie'];
-  const lastNames = [
-  	'Stool', 'Doodle', 'Killjoy', 'Trump', 'Gelato'];
-
-  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-  return firstName + ' ' + lastName;
-}
-
-function generateContent() {
-  const content = [
-    'I will defeat you, Kakarot.', 'I ate a thing.', 'I saw a thing.', 'I did a thing.', 'I heard a thing.'];
-  return content[Math.floor(Math.random() * content.length)];
-}
-
-function generateTitleName() {
-  const titles = [
-    'Indoor Mountaineering', 'The Ponderings of a Fool', 'The Time I Went Outside', 'Defeating Goku', 'Natural vs. Artificial Deodorant'];
-  return titles[Math.floor(Math.random() * titles.length)];
-}
-
 function generateBlogPostData() {
   return {
-    author: generateAuthorName(),
-    content: generateContent(),
-    title: generateTitleName(),
+    author: {firstName: faker.name.firstName(), lastName: faker.name.lastName()},
+    content: faker.lorem.text(),
+    title: faker.lorem.sentence(),
     created: faker.date.past()
   };
 }
@@ -62,7 +38,7 @@ function tearDownDb() {
   return mongoose.connection.dropDatabase();
 }
 
-describe('Restaurants API resource'), function() {
+describe('BlogPost API resource', function() {
 
 	before(function() {
 		return runServer(TEST_DATABASE_URL);
@@ -84,16 +60,17 @@ describe('Restaurants API resource'), function() {
 
 		it('should return all existing posts', function() {
 
-			let res;
+			let _res;
 			return chai.request(app)
 				.get('/posts')
 				.then(function(res) {
+					_res = res;
 					expect(res).to.have.status(200);
-					expect(res.body.posts).to.have.lengthOf.at.least(1);
+					expect(res.body).to.have.lengthOf.at.least(1);
 					return BlogPost.count();
 	  			})
 	  			.then(function(count) {
-	  				expect(res.body.posts).to.have.lengthOf(count);
+	  				expect(_res.body).to.have.lengthOf(count);
 	  			});
 			});
 
@@ -105,24 +82,26 @@ describe('Restaurants API resource'), function() {
 				.then(function(res) {
 					expect(res).to.have.status(200);
 					expect(res).to.be.json;
-					expect(res.body.posts).to.be.a('array');
-					expect(res.body.posts).to.have.lengthOf.at.least(1);
+					expect(res.body).to.be.a('array');
+					expect(res.body).to.have.lengthOf.at.least(1);
 
-					res.body.posts.forEach(function(BlogPost) {
+					res.body.forEach(function(post) {
 						expect(post).to.be.a('object');
 						expect(post).to.include.keys(
 							'id', 'author', 'content', 'title', 'created');
 					});
-					resBlogPost = res.body.posts[0];
+					resBlogPost = res.body[0];
 					return BlogPost.findById(resBlogPost.id);
-				});
+				})
 				.then(function(post) {
 
+					console.log(resBlogPost);
+					console.log(post);
 					expect(resBlogPost.id).to.equal(post.id);
-					expect(resBlogPost.author).to.equal(post.author);
+					expect(resBlogPost.author).to.equal(post.author.firstName.concat(" ", post.author.lastName));
 					expect(resBlogPost.content).to.equal(post.content);
 					expect(resBlogPost.title).to.equal(post.title);
-					expect(resBlogPost.created).to.equal(post.created);
+					expect(new Date(resBlogPost.created).toString).to.equal(new Date(post.created).toString);
 			})
 		})
 	});
@@ -140,13 +119,13 @@ describe('Restaurants API resource'), function() {
 					expect(res).to.have.status(201);
 					expect(res).to.be.json;
 					expect(res.body).to.be.a('object');
-					expect(res.body.to.include.key(
+					expect(res.body).to.include.keys(
 						'id', 'author', 'content', 'title', 'created'
 						);
 					expect(res.body.author).to.not.be.null;
 					expect(res.body.content).to.equal(newBlogPost.content);
 					expect(res.body.title).to.equal(newBlogPost.title);
-					expect(res.body.created).to.equal(newBlogPost.created);
+					expect(new Date(res.body.created).toString).to.equal(new Date(newBlogPost.created).toString);
 			})
 		})
 	})
@@ -175,8 +154,8 @@ describe('Restaurants API resource'), function() {
 					return BlogPost.findById(updateData.id);
 				})
 				.then(function(post) {
-					expect(post.author).to.equal(updateData.author);
 					expect(post.content).to.equal(updateData.content);
+					expect(post.author).to.equal(updateData.author);
 				});
 			});
 		});
@@ -202,4 +181,4 @@ describe('Restaurants API resource'), function() {
 				});
 			});
 		});
-	};
+	});
